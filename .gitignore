@@ -1,0 +1,7 @@
+# build artifacts
+dist/
+build/
+coverage/
+*.lcov
+stryker-report/
+sbom*.json

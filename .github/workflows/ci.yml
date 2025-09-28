@@ -1,0 +1,95 @@
+name: test
+on:
+  pull_request: { branches: [main] }
+  push: { branches: [main] }
+
+env:
+  NODE_VERSION: '20'
+  API_DIR: services/api
+  WEB_DIR: web
+
+permissions:
+  contents: read
+  id-token: write         # for provenance + OIDC
+  attestations: write
+  actions: read
+
+jobs:
+  api-web-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ---------- API ----------
+      - name: Setup Node (API)
+        uses: actions/setup-node@v4
+        with: { node-version: ${{ env.NODE_VERSION }} }
+      - name: Install API deps
+        working-directory: ${{ env.API_DIR }}
+        run: npm ci
+      - name: Build API
+        working-directory: ${{ env.API_DIR }}
+        run: npm run build --if-present
+      - name: Test API (with coverage)
+        working-directory: ${{ env.API_DIR }}
+        run: npm run test -- --ci --runInBand --coverage
+      - name: Enforce API coverage ≥ 98%
+        working-directory: ${{ env.API_DIR }}
+        run: |
+          THRESH=0.98
+          ACTUAL=$(node -e "console.log(require('./coverage/coverage-summary.json').total.lines.pct/100)")
+          awk -v a="$ACTUAL" -v t="$THRESH" 'BEGIN{exit !(a>=t)}' || \
+            { echo "Coverage below threshold: $ACTUAL < $THRESH"; exit 1; }
+      - name: API mutation testing (≥60%)
+        working-directory: ${{ env.API_DIR }}
+        run: npx stryker run
+
+      # ---------- WEB ----------
+      - name: Install Web deps
+        working-directory: ${{ env.WEB_DIR }}
+        run: npm ci
+      - name: Build Web
+        working-directory: ${{ env.WEB_DIR }}
+        run: npm run build --if-present
+      - name: Test Web (with coverage)
+        working-directory: ${{ env.WEB_DIR }}
+        run: npm run test -- --ci --runInBand --coverage
+      - name: Enforce Web coverage ≥ 98%
+        working-directory: ${{ env.WEB_DIR }}
+        run: |
+          THRESH=0.98
+          ACTUAL=$(node -e "console.log(require('./coverage/coverage-summary.json').total.lines.pct/100)")
+          awk -v a="$ACTUAL" -v t="$THRESH" 'BEGIN{exit !(a>=t)}' || \
+            { echo "Coverage below threshold: $ACTUAL < $THRESH"; exit 1; }
+      - name: Web mutation testing (≥60%)
+        working-directory: ${{ env.WEB_DIR }}
+        run: npx stryker run
+
+      # ---------- SBOM (both projects) ----------
+      - name: Generate CycloneDX SBOM (API)
+        uses: CycloneDX/gh-node-module-generatebom@v3
+        with:
+          path: ${{ env.API_DIR }}
+          output: '${{ env.API_DIR }}/sbom-api.cdx.json'
+      - name: Generate CycloneDX SBOM (Web)
+        uses: CycloneDX/gh-node-module-generatebom@v3
+        with:
+          path: ${{ env.WEB_DIR }}
+          output: '${{ env.WEB_DIR }}/sbom-web.cdx.json'
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sboms
+          path: |
+            ${{ env.API_DIR }}/sbom-api.cdx.json
+            ${{ env.WEB_DIR }}/sbom-web.cdx.json
+
+      # ---------- SLSA provenance ----------
+      - name: Attest build provenance (API)
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: '${{ env.API_DIR }}/dist/**'
+      - name: Attest build provenance (Web)
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: '${{ env.WEB_DIR }}/build/**'

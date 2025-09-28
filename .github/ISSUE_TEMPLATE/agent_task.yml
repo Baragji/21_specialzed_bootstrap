@@ -1,0 +1,33 @@
+name: Agent Task
+description: Atomic, bounded task for GitHub Copilot – Coding Agent
+labels: [ai-task]
+body:
+  - type: input
+    id: objective
+    attributes: { label: Objective, placeholder: "Add rate limiter to /v1/api..." }
+    validations: { required: true }
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: "Touched paths only; forbidden areas; time/cost caps"
+      value: |
+        ALLOWED_PATHS: ["services/api/**","web/**","tests/**"]
+        FORBIDDEN_PATHS: ["infra/**","migrations/**"]
+        TIME_CAP_MIN: 30
+        COST_CAP_USD: 1.50
+  - type: textarea
+    id: test_spec
+    attributes:
+      label: Test expectations
+      value: |
+        - Unit tests cover new branches
+        - Integration tests for API endpoints touched
+        - Keep public APIs backward compatible
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - All required checks green (test, codeql, sbom, provenance, coverage, mutation)
+        - PR description lists files changed + rationale
