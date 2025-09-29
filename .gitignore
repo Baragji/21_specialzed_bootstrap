@@ -27,7 +27,11 @@ sbom*.json
 .env
 .env.*
 !.env.example
+secrets/
 
 # Misc
 .tmp/
 .cache/
+configure_orchestrator_env.sh
+github-app-credentials.txt
+.DS_Store
