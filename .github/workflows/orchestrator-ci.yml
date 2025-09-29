@@ -1,0 +1,68 @@
+name: orchestrator-ci
+on:
+  pull_request:
+    branches: [main, aws_gh_setup]
+  push:
+    branches: [main, aws_gh_setup]
+
+env:
+  NODE_VERSION: '20'
+  ORCHESTRATOR_DIR: services/orchestrator
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+  actions: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        working-directory: ${{ env.ORCHESTRATOR_DIR }}
+        run: npm ci || npm install
+
+      - name: Build orchestrator
+        working-directory: ${{ env.ORCHESTRATOR_DIR }}
+        run: npm run build
+
+      - name: Test orchestrator (with coverage)
+        working-directory: ${{ env.ORCHESTRATOR_DIR }}
+        run: npm run test -- --ci --runInBand --coverage
+
+      - name: Enforce coverage ≥ 98%
+        working-directory: ${{ env.ORCHESTRATOR_DIR }}
+        run: |
+          THRESH=0.98
+          ACTUAL=$(node -e "console.log(require('./coverage/coverage-summary.json').total.lines.pct/100)")
+          awk -v a="$ACTUAL" -v t="$THRESH" 'BEGIN{exit !(a>=t)}' || {
+            echo "Coverage below threshold: $ACTUAL < $THRESH";
+            exit 1;
+          }
+
+      - name: Mutation testing (≥60%)
+        working-directory: ${{ env.ORCHESTRATOR_DIR }}
+        run: npx stryker run
+
+      - name: Generate CycloneDX SBOM
+        working-directory: ${{ env.ORCHESTRATOR_DIR }}
+        run: npx @cyclonedx/cyclonedx-npm --output-file sbom-orchestrator.cdx.json --output-format JSON
+
+      - name: sboms-orchestrator
+        uses: actions/upload-artifact@v4
+        with:
+          name: sboms-orchestrator
+          path: ${{ env.ORCHESTRATOR_DIR }}/sbom-orchestrator.cdx.json
+
+      - name: Attest build provenance (Orchestrator)
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: '${{ env.ORCHESTRATOR_DIR }}/dist/**'

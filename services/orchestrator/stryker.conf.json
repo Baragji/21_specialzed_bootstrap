@@ -1,0 +1,14 @@
+{
+  "testRunner": "jest",
+  "jest": {
+    "configFile": "jest.config.ci.js"
+  },
+  "reporters": ["progress", "html"],
+  "mutate": ["src/**/*.ts"],
+  "ignorePatterns": ["dist/**", "node_modules/**"],
+  "thresholds": {
+    "high": 70,
+    "low": 60,
+    "break": 60
+  }
+}
