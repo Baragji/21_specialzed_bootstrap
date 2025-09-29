@@ -1,0 +1,57 @@
+name: deploy-orchestrator
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-central-1
+  ORCHESTRATOR_DIR: services/orchestrator
+  IMAGE_TAG: ${{ github.sha }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Authenticate to AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_BACKEND_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build orchestrator image
+        working-directory: ${{ env.ORCHESTRATOR_DIR }}
+        run: |
+          docker build \
+            -t ${{ steps.ecr.outputs.registry }}/${{ secrets.ECR_ORCHESTRATOR_REPO }}:${{ env.IMAGE_TAG }} \
+            -f Dockerfile.api .
+
+      - name: Push orchestrator image
+        run: |
+          docker push ${{ steps.ecr.outputs.registry }}/${{ secrets.ECR_ORCHESTRATOR_REPO }}:${{ env.IMAGE_TAG }}
+
+      - name: Update ECS service
+        run: |
+          aws ecs update-service \
+            --cluster ${{ secrets.ECS_CLUSTER }} \
+            --service ${{ secrets.ECS_ORCHESTRATOR_SERVICE }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for stability
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ secrets.ECS_CLUSTER }} \
+            --services ${{ secrets.ECS_ORCHESTRATOR_SERVICE }}

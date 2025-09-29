@@ -1,0 +1,23 @@
+# Stage 1: dependency installation
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+
+# Stage 2: build the TypeScript sources
+FROM deps AS build
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+RUN npm prune --omit=dev
+
+# Stage 3: production runtime
+FROM node:20-alpine AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY package.json ./package.json
+USER node
+EXPOSE 8080
+CMD ["node", "dist/server.js"]
