@@ -5,6 +5,7 @@ Production-ready skeleton for routing customer tasks through GitHub Copilot Codi
 ## Capabilities
 - `GET /healthz` for ALB and diagnostics.
 - `POST /webhooks/github` verifies `X-Hub-Signature-256`, enforces a 100 req/min rate limit, and logs structured event metadata only.
+- `POST /tasks` validates task requests and creates GitHub “Agent Task” issues via the App installation.
 - Hardened Node.js 20 + Fastify service with coverage, mutation, SBOM, and SLSA gates wired through GitHub Actions.
 - Containerized build ready for ECS Fargate using existing OIDC trusts.
 
@@ -93,6 +94,39 @@ curl -i \
 ```
 
 Invalid signatures return `401` with body `{"status":"invalid signature"}`.
+
+### Tasks API
+`POST /tasks` creates a GitHub issue that follows the “Agent Task” template.
+
+#### Example request
+```bash
+curl -sS -X POST http://localhost:8080/tasks \
+  -H 'content-type: application/json' \
+  -d '{
+        "owner":"YOUR_ORG",
+        "repo":"YOUR_REPO",
+        "title":"Expose /version",
+        "objective":"Add /version endpoint and surface it in the web UI",
+        "constraints":{
+          "allowedPaths":["services/api/**","web/**","tests/**"],
+          "forbiddenPaths":["infra/**","migrations/**"],
+          "timeCapMin":30,
+          "costCapUSD":1.5
+        },
+        "testSpec":["Unit test for /version","Web renders version"],
+        "acceptance":["All checks green"]
+      }'
+```
+
+#### Example response
+```json
+{
+  "issue_number": 123,
+  "issue_url": "https://github.com/YOUR_ORG/YOUR_REPO/issues/123"
+}
+```
+
+If `labels` are supplied they are merged with `ai-task`; when omitted the service automatically adds `ai-task`.
 
 ## CI / Quality Gates
 The workflow `.github/workflows/orchestrator-ci.yml` runs on pushes and pull requests targeting `main` and `aws_gh_setup` and enforces:

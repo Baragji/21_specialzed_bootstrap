@@ -5,6 +5,7 @@ import pino from 'pino';
 import { z } from 'zod';
 
 import { verifySignature } from './github/signature';
+import { registerTasksRoute } from './routes/tasks';
 import { AppConfig, WebhookLogPayload, WebhookRateLimit } from './types';
 
 declare module 'fastify' {
@@ -257,6 +258,8 @@ export function buildServer(config: AppConfig): FastifyInstance {
       return reply.code(200).send({ status: 'received' });
     },
   );
+
+  registerTasksRoute(app);
 
   return app;
 }
