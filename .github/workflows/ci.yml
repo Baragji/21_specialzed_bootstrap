@@ -23,7 +23,8 @@ jobs:
       # ---------- API ----------
       - name: Setup Node (API)
         uses: actions/setup-node@v4
-        with: { node-version: ${{ env.NODE_VERSION }} }
+        with:
+          node-version: ${{ env.NODE_VERSION }}
       - name: Install API deps
         working-directory: ${{ env.API_DIR }}
         run: npm ci || npm install
