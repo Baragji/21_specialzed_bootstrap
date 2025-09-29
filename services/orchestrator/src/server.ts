@@ -1,5 +1,6 @@
 import Fastify, { FastifyBaseLogger, FastifyInstance, FastifyRequest } from 'fastify';
 import rateLimit from '@fastify/rate-limit';
+import type { RateLimitOptions as FastifyRateLimitOptions } from '@fastify/rate-limit';
 import pino from 'pino';
 import { z } from 'zod';
 
@@ -9,6 +10,10 @@ import { AppConfig, WebhookLogPayload, WebhookRateLimit } from './types';
 declare module 'fastify' {
   interface FastifyRequest {
     rawBody?: string;
+  }
+  interface FastifyInstance {
+    orchestratorRateLimit?: FastifyRateLimitOptions;
+    orchestratorInternalLimiter?: boolean;
   }
 }
 
@@ -150,7 +155,22 @@ export function buildServer(config: AppConfig): FastifyInstance {
     max: 100,
     timeWindow: '1 minute',
   };
-  const enforceRateLimit = createRateLimiter(rateLimitConfig);
+  const useInternalLimiter = process.env.RATE_LIMIT_MODE === 'internal';
+  const enforceRateLimit = useInternalLimiter ? createRateLimiter(rateLimitConfig) : undefined;
+
+  void app.register(rateLimit, {
+    global: false,
+    ban: 0,
+  });
+
+  const routeMaxEnv = Number.parseInt(process.env.RATE_LIMIT_MAX ?? '', 10);
+  const routeRateLimit: FastifyRateLimitOptions = {
+    max: Number.isNaN(routeMaxEnv) ? rateLimitConfig.max : Math.max(1, routeMaxEnv),
+    timeWindow: resolveTimeWindowMs(rateLimitConfig.timeWindow),
+  };
+
+  app.decorate('orchestratorRateLimit', routeRateLimit);
+  app.decorate('orchestratorInternalLimiter', useInternalLimiter);
 
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (request, body, done) => {
     const bodyString = body as string;
@@ -169,14 +189,6 @@ export function buildServer(config: AppConfig): FastifyInstance {
     }
   });
 
-  app.register(rateLimit, {
-    global: false,
-    max: rateLimitConfig.max,
-    timeWindow: rateLimitConfig.timeWindow,
-    ban: 0,
-    errorResponseBuilder: rateLimitErrorResponse,
-  });
-
   app.get('/healthz', async (_request, reply) => {
     return reply.send({ status: 'ok' });
   });
@@ -185,15 +197,20 @@ export function buildServer(config: AppConfig): FastifyInstance {
     '/webhooks/github',
     {
       config: {
-        rateLimit: rateLimitConfig,
+        rateLimit: routeRateLimit,
       },
+      preHandler: useInternalLimiter
+        ? [
+            async (request, reply) => {
+              if (enforceRateLimit && !enforceRateLimit(request)) {
+                request.log.warn({ reason: 'rate_limited' }, 'github webhook rate limited (internal)');
+                return reply.code(429).send(rateLimitErrorResponse());
+              }
+            },
+          ]
+        : undefined,
     },
     async (request, reply) => {
-      if (!enforceRateLimit(request)) {
-        request.log.warn({ reason: 'rate_limited' }, 'github webhook rate limited');
-        return reply.code(429).send(rateLimitErrorResponse());
-      }
-
       const signature = firstHeaderValue(request.headers['x-hub-signature-256']);
       const eventValue = firstHeaderValue(request.headers['x-github-event']);
       const deliveryId = firstHeaderValue(request.headers['x-github-delivery']);

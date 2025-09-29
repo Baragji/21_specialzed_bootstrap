@@ -34,6 +34,15 @@ function makeSignature(body: string, key: string): string {
 
 describe('orchestrator webhook', () => {
   const servers: Array<ReturnType<typeof buildServer>> = [];
+  const originalRateLimitMode = process.env.RATE_LIMIT_MODE;
+
+  beforeAll(() => {
+    process.env.RATE_LIMIT_MODE = 'internal';
+  });
+
+  afterAll(() => {
+    process.env.RATE_LIMIT_MODE = originalRateLimitMode;
+  });
 
   afterEach(async () => {
     while (servers.length) {
@@ -101,6 +110,22 @@ describe('orchestrator webhook', () => {
       expect(app.log.level).toBe('info');
     } finally {
       process.env.LOG_LEVEL = originalLevel;
+    }
+  });
+
+  test('logger defaults to info when LOG_LEVEL undefined', async () => {
+    const originalLevel = process.env.LOG_LEVEL;
+    delete process.env.LOG_LEVEL;
+    try {
+      const app = buildServer(baseConfig);
+      servers.push(app);
+      expect(app.log.level).toBe('info');
+    } finally {
+      if (originalLevel === undefined) {
+        delete process.env.LOG_LEVEL;
+      } else {
+        process.env.LOG_LEVEL = originalLevel;
+      }
     }
   });
 
@@ -282,6 +307,44 @@ describe('orchestrator webhook', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: 'received' });
+  });
+
+  test('internal rate limiter toggles based on RATE_LIMIT_MODE', async () => {
+    process.env.RATE_LIMIT_MODE = 'internal';
+    const internalApp = buildServer(baseConfig);
+    servers.push(internalApp);
+    expect((internalApp as any).orchestratorInternalLimiter).toBe(true);
+  });
+
+  test('route-level rate limit configuration honours environment overrides', async () => {
+    const previousMode = process.env.RATE_LIMIT_MODE;
+    const previousMax = process.env.RATE_LIMIT_MAX;
+    delete process.env.RATE_LIMIT_MODE;
+    process.env.RATE_LIMIT_MAX = '2';
+
+    try {
+      const app = buildServer(baseConfig);
+      servers.push(app);
+
+      await app.ready();
+
+      const routeConfig = (app as any).orchestratorRateLimit;
+      expect(routeConfig?.max).toBe(2);
+      expect(routeConfig?.timeWindow).toBe(resolveTimeWindowMs('1 minute'));
+      expect((app as any).orchestratorInternalLimiter).toBe(false);
+    } finally {
+      if (previousMode === undefined) {
+        delete process.env.RATE_LIMIT_MODE;
+      } else {
+        process.env.RATE_LIMIT_MODE = previousMode;
+      }
+
+      if (previousMax === undefined) {
+        delete process.env.RATE_LIMIT_MAX;
+      } else {
+        process.env.RATE_LIMIT_MAX = previousMax;
+      }
+    }
   });
 
   test('empty payload passes signature validation', async () => {

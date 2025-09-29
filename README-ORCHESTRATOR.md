@@ -17,6 +17,8 @@ Set the following variables for both local runs and ECS tasks:
 | `GITHUB_APP_ID` | Numeric App ID from the GitHub App settings. |
 | `GITHUB_WEBHOOK_SECRET` | Shared secret used to sign GitHub webhook payloads. |
 | `GITHUB_APP_PRIVATE_KEY` | Base64-encoded GitHub App private key (PEM). |
+| `RATE_LIMIT_MAX` | Optional override for maximum requests per window (defaults to 100). |
+| `RATE_LIMIT_MODE` | Leave unset (plugin-enforced) in production; set to `internal` only in tests to use the deterministic in-memory limiter. |
 
 > Decode the private key inside the container or runtime when you need to call GitHub APIs. The service only checks that the secret exists during boot.
 
