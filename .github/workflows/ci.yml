@@ -1,7 +1,7 @@
 name: test
 on:
-  pull_request: { branches: [main] }
-  push: { branches: [main] }
+  pull_request: { branches: [main, aws_gh_setup] }
+  push: { branches: [main, aws_gh_setup] }
 
 env:
   NODE_VERSION: '20'
