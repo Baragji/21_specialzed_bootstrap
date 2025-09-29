@@ -1,6 +1,6 @@
 {
   "testRunner": "jest",
-  "jest": { "configFile": "jest.config.ci.js" },
+  "jest": { "configFile": "jest.config.ci.cjs" },
   "reporters": ["progress", "html"],
   "mutate": ["src/**/*.ts"],
   "ignorePatterns": ["dist/**", "node_modules/**"],

@@ -48,7 +48,7 @@ jobs:
       # ---------- WEB ----------
       - name: Install Web deps
         working-directory: ${{ env.WEB_DIR }}
-        run: npm ci
+        run: npm ci || npm install
       - name: Build Web
         working-directory: ${{ env.WEB_DIR }}
         run: npm run build --if-present
