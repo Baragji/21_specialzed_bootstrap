@@ -38,10 +38,11 @@ jobs:
       - name: Build API image
         working-directory: ${{ env.API_DIR }}
         run: |
-          docker build -t ${{ steps.ecr.outputs.registry }}/${{ secrets.ECR_API_REPO }}:${{ env.IMAGE_TAG }} -f Dockerfile.api .
-      - name: Push API image
+          docker build -t ${{ steps.ecr.outputs.registry }}/${{ secrets.ECR_API_REPO }}:${{ env.IMAGE_TAG }} -t ${{ steps.ecr.outputs.registry }}/${{ secrets.ECR_API_REPO }}:latest -f Dockerfile.api .
+      - name: Push API images (sha and latest)
         run: |
           docker push ${{ steps.ecr.outputs.registry }}/${{ secrets.ECR_API_REPO }}:${{ env.IMAGE_TAG }}
+          docker push ${{ steps.ecr.outputs.registry }}/${{ secrets.ECR_API_REPO }}:latest
 
       - name: Update ECS service
         run: |

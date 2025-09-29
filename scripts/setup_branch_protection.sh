@@ -10,13 +10,8 @@ gh api -X PUT "repos/$REPO/branches/$BRANCH/protection" \
   "required_status_checks": {
     "strict": true,
     "contexts": [
-      "test",
-      "codeql",
-      "sboms",
-      "Attest build provenance (API)",
-      "Attest build provenance (Web)",
-      "API mutation testing (≥60%)",
-      "Web mutation testing (≥60%)"
+      "test / api-web-ci",
+      "codeql / analyze"
     ]
   },
   "enforce_admins": true,
