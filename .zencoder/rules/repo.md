@@ -19,7 +19,7 @@ A template repository for setting up autonomous coding with GitHub Copilot Codin
 ## Language & Runtime
 **Language**: TypeScript/JavaScript
 **Version**: Node.js v20 (specified in .nvmrc)
-**Build System**: npm
+**Build System**: npm 
 **Package Manager**: npm
 
 ## Dependencies
