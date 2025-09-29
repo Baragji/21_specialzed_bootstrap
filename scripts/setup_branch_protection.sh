@@ -5,15 +5,26 @@ BRANCH="${2:-main}"
 
 gh api -X PUT "repos/$REPO/branches/$BRANCH/protection" \
   -H "Accept: application/vnd.github+json" \
-  -f required_status_checks.strict=true \
-  -f enforce_admins=true \
-  -f required_pull_request_reviews.dismiss_stale_reviews=true \
-  -f required_pull_request_reviews.required_approving_review_count=1 \
-  -F required_status_checks.contexts[]="test" \
-  -F required_status_checks.contexts[]="codeql" \
-  -F required_status_checks.contexts[]="sboms" \
-  -F required_status_checks.contexts[]="Attest build provenance (API)" \
-  -F required_status_checks.contexts[]="Attest build provenance (Web)" \
-  -F required_status_checks.contexts[]="API mutation testing (≥60%)" \
-  -F required_status_checks.contexts[]="Web mutation testing (≥60%)"
+  --input - <<EOF
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": [
+      "test",
+      "codeql",
+      "sboms",
+      "Attest build provenance (API)",
+      "Attest build provenance (Web)",
+      "API mutation testing (≥60%)",
+      "Web mutation testing (≥60%)"
+    ]
+  },
+  "enforce_admins": true,
+  "required_pull_request_reviews": {
+    "dismiss_stale_reviews": true,
+    "required_approving_review_count": 1
+  },
+  "restrictions": null
+}
+EOF
 echo "Branch protection configured for $REPO@$BRANCH"
