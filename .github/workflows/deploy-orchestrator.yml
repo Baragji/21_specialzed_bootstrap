@@ -1,6 +1,9 @@
 name: deploy-orchestrator
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - aws_gh_setup
 
 env:
   AWS_REGION: eu-north-1
