@@ -30,13 +30,27 @@ log "Setting up AWS resources for $REPO_NAME in region $AWS_REGION (Account: $AC
 echo "${AWS_REGION}" >"/tmp/${REPO_NAME}-aws-region"
 
 ensure_ecr_repository() {
-  local repository_name="$REPO_NAME/api"
-  if aws ecr describe-repositories --repository-names "$repository_name" --region "$AWS_REGION" >/dev/null 2>&1; then
-    log "ECR repository $repository_name already exists"
+  # Ensure API repository
+  local api_repo_name="$REPO_NAME/api"
+  if aws ecr describe-repositories --repository-names "$api_repo_name" --region "$AWS_REGION" >/dev/null 2>&1; then
+    log "ECR repository $api_repo_name already exists"
   else
-    log "Creating ECR repository $repository_name"
+    log "Creating ECR repository $api_repo_name"
     aws ecr create-repository \
-      --repository-name "$repository_name" \
+      --repository-name "$api_repo_name" \
+      --region "$AWS_REGION" \
+      --image-scanning-configuration scanOnPush=true \
+      --encryption-configuration encryptionType=AES256 >/dev/null
+  fi
+
+  # Ensure Orchestrator repository
+  local orchestrator_repo_name="orchestrator"
+  if aws ecr describe-repositories --repository-names "$orchestrator_repo_name" --region "$AWS_REGION" >/dev/null 2>&1; then
+    log "ECR repository $orchestrator_repo_name already exists"
+  else
+    log "Creating ECR repository $orchestrator_repo_name"
+    aws ecr create-repository \
+      --repository-name "$orchestrator_repo_name" \
       --region "$AWS_REGION" \
       --image-scanning-configuration scanOnPush=true \
       --encryption-configuration encryptionType=AES256 >/dev/null
@@ -315,6 +329,7 @@ ensure_roles() {
     --arg region "$AWS_REGION" \
     --arg account "$ACCOUNT_ID" \
     --arg repo "$REPO_NAME/api" \
+    --arg orchestrator_repo "orchestrator" \
     --arg cluster "$REPO_NAME-cluster" \
     --arg service "$REPO_NAME-service" '{
       Version: "2012-10-17",
@@ -329,7 +344,10 @@ ensure_roles() {
           "ecr:ListImages",
           "ecr:PutImage",
           "ecr:UploadLayerPart"
-        ], Resource: ("arn:aws:ecr:" + $region + ":" + $account + ":repository/" + $repo)},
+        ], Resource: [
+          ("arn:aws:ecr:" + $region + ":" + $account + ":repository/" + $repo),
+          ("arn:aws:ecr:" + $region + ":" + $account + ":repository/" + $orchestrator_repo)
+        ]},
         {Effect: "Allow", Action: ["ecs:DescribeServices", "ecs:UpdateService"], Resource: ("arn:aws:ecs:" + $region + ":" + $account + ":service/" + $cluster + "/" + $service)},
         {Effect: "Allow", Action: ["ecs:DescribeTaskDefinition", "ecs:RegisterTaskDefinition"], Resource: "*"},
         {Effect: "Allow", Action: ["iam:PassRole"], Resource: ("arn:aws:iam::" + $account + ":role/ecsTaskExecutionRole")}
@@ -390,8 +408,9 @@ ensure_roles
 cat <<SUMMARY
 ✅ AWS resources provisioned
 
-� ECR repository:
+📦 ECR repositories:
 - $REPO_NAME/api
+- orchestrator
 
 🪣 S3 buckets:
 - $REPO_NAME-staging (website endpoint: $(website_endpoint "$REPO_NAME-staging"))
