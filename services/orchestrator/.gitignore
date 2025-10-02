@@ -1,0 +1,8 @@
+# Orchestrator service ignores
+node_modules/
+dist/
+coverage/
+reports/
+.stryker-tmp/
+.nyc_output/
+*.log
