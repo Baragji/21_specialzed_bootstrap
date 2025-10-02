@@ -1,61 +1,55 @@
-Title: Task #4 — UI v0 (Create Task + Status View) wired to Orchestrator
+Title: Pre-flight (CI+deploy+housekeeping) → then Task #4 UI v0
 
+Phase A — Pre-flight on current Task 3 branch
+1) CI: Run full pipeline (tests, coverage gates, mutation, SBOM, SLSA). Confirm mutation ≥60%.
+2) Deploy: Run deploy-orchestrator; verify:
+   - GET /healthz → 200 {"status":"ok"}
+   - POST /tasks → 201 and a live GitHub Issue created
+3) ts-jest warnings:
+   - Move ts-jest transform config into Jest config file
+   - Add a dedicated test tsconfig (tsconfig.jest.json) with "isolatedModules": true
+4) State machine required checks:
+   - Ensure the constant list exactly matches branch protection check names:
+     ["test","codeql","sboms-orchestrator","Attest build provenance (Orchestrator)"]
+   - Update README to reflect these names
+5) Open PR → ensure all checks green → merge → redeploy orchestrator.
+
+Phase B — Task #4 UI v0 (Create Task + Status)
 Objective
-Deliver a minimal customer-facing UI that:
-1) Submits new agent tasks to the orchestrator (POST /tasks)
-2) Shows status for a task (GET /tasks/:issue_number)
-Non-goals: auth, dashboards, persistence; keep it tiny but production-ready.
+- A tiny React/TS front end that: (1) posts new tasks to the orchestrator, (2) shows live status of a task.
 
-Scope & stack
+Scope
 - Touch only: web/**
-- React + TypeScript + existing CSS/Tailwind setup (reuse project conventions)
-- Environment: ORCHESTRATOR_BASE (e.g., https://<domain>)
-- Tests: component + integration (mock fetch); coverage must keep repo-wide thresholds green.
+- Use env var: ORCHESTRATOR_BASE
+- Keep repo gates green (coverage ≥98% lines/statements, ≥95% branches for web/)
 
-Screens & routes
-1) `/` — “New Task” form
-   - Fields: owner, repo, title, objective (required)
-   - Optional sections (collapsible): constraints (allowedPaths[], forbiddenPaths[], timeCapMin, costCapUSD),
-     testSpec[] (string list), acceptance[] (string list), labels[] (default includes "ai-task")
-   - Submit → POST `${ORCHESTRATOR_BASE}/tasks`
-   - On 201: show success with Issue link and a “View Status” button → `/status/:issue_number`
+Routes & features
+1) `/` NewTask:
+   - Required fields: owner, repo, title, objective
+   - Optional: constraints.allowedPaths[], constraints.forbiddenPaths[], timeCapMin, costCapUSD, testSpec[], acceptance[], labels[]
+   - POST `${ORCHESTRATOR_BASE}/tasks`; on 201 show Issue link and “View Status” → `/status/:issue_number`
+2) `/status/:issue_number` TaskStatus:
+   - GET `${ORCHESTRATOR_BASE}/tasks/:issue_number` every 5s
+   - Show state badge (CREATED/IN_PROGRESS/PR_OPEN/CHECKS_GREEN/CHECKS_RED/MERGED/FAILED), checks panel, PR/Issue links
 
-2) `/status/:issue_number` — live status
-   - On load: GET `${ORCHESTRATOR_BASE}/tasks/:issue_number`
-   - Render: state badge (CREATED/IN_PROGRESS/PR_OPEN/CHECKS_GREEN/CHECKS_RED/MERGED/FAILED),
-     lastEvent timestamp, checks panel (required checks + pass/fail), PR link (if any), Issue link.
-   - Poll every 5s (clear on unmount)
-
-Files (suggested)
+File sketch
 - web/src/pages/NewTask.tsx
 - web/src/pages/TaskStatus.tsx
-- web/src/api/orchestrator.ts (fetch helpers with timeouts/retry)
-- web/src/components/FormArray.tsx (add/remove list items)
+- web/src/api/orchestrator.ts (fetch with timeout + one retry for status)
+- web/src/components/FormArray.tsx
 - web/src/types.ts (TaskRequest, TaskStatusResponse)
-- web/src/tests/NewTask.spec.tsx, TaskStatus.spec.tsx, orchestrator.spec.ts (mocks)
-
-Validation & UX
-- Client-side required validation for owner/repo/title/objective
-- Disable submit while in-flight, show error banner on non-2xx
-- Never display secrets; log only summary data in dev
-
-Config
-- web/.env.example → ORCHESTRATOR_BASE=<https://your-domain>
-- Use runtime injection if you already support it; otherwise static env for now
+- web/.env.example (ORCHESTRATOR_BASE)
+- Tests: web/src/tests/NewTask.spec.tsx, TaskStatus.spec.tsx, orchestrator.spec.ts
 
 Tests (must cover)
-- Successful POST → navigates to /status/:id and renders Issue link
-- 400 path → shows validation error
-- Status polling renders state transitions (mock sequence: CREATED → PR_OPEN → CHECKS_GREEN)
-- Edge: network error → retry/backoff once, then show error
+- Successful POST navigates to /status/:id and renders Issue link
+- 400 from orchestrator shows validation error banner
+- Status polling renders transition sequence (mock: CREATED → PR_OPEN → CHECKS_GREEN)
+- Error path (network) → retry once then surface error
 
 Acceptance criteria
-1) UI builds and passes tests; coverage remains ≥98% lines/statements, ≥95% branches for web/.
-2) New Task form successfully creates an issue (manually verified against staging orchestrator).
-3) Status page reflects transitions based on orchestrator’s GET response (verified with mocked sequence).
-4) No secrets in the UI bundle; .env.example updated; README updated with usage.
+- All web/ tests pass with coverage ≥98% lines/statements and ≥95% branches; mutation budget unaffected
+- Manual: form creates a task against staging orchestrator; status page reflects state
+- No secrets in bundle; .env.example updated; README section added
 
-Notes
-- Keep components small; no global state manager required.
-- Prefer native `fetch` with AbortController; 5s timeout; one retry for status polling.
-- Do not add auth yet; staging may be public behind rate limits.
+Labels for PRs: ui, orchestrator, ai-task

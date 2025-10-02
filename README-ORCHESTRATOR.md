@@ -135,8 +135,14 @@ The workflow `.github/workflows/orchestrator-ci.yml` runs on pushes and pull req
 - CycloneDX SBOM artifact upload (`sboms-orchestrator`).
 - SLSA provenance via `actions/attest-build-provenance` on `services/orchestrator/dist/**`.
 
-Required check to block merges:
+Required checks to block merges (branch protection):
 - `orchestrator-ci / orchestrator-ci`
+- `test`
+- `codeql`
+- `sboms-orchestrator`
+- `Attest build provenance (Orchestrator)`
+
+These names must match the orchestrator state machine's REQUIRED_CHECKS list for checks aggregation.
 
 ## Deployment
 Trigger `.github/workflows/deploy-orchestrator.yml` manually once repository secrets are in place. The workflow:
