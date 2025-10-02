@@ -17,6 +17,8 @@
 3. `./scripts/setup_branch_protection.sh your-org/your-repo`
 4. Create an issue using **Agent Task** template and assign to **@copilot**
 
+> Small test change to validate CI end-to-end (smoke PR).
+
 ## Required repo secrets
 - **AWS / Backend**: `AWS_BACKEND_ROLE_ARN`, `ECR_API_REPO`, `ECS_CLUSTER`, `ECS_SERVICE`, `AWS_REGION` (optional, defaults `eu-central-1`)
 - **AWS / Frontend**: `AWS_FRONTEND_ROLE_ARN`, `S3_STAGING_BUCKET`, `S3_PRODUCTION_BUCKET`, `CF_STAGING_DISTRIBUTION`, `CF_PRODUCTION_DISTRIBUTION`

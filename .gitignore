@@ -1,7 +1,37 @@
-# build artifacts
+# OS/editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Node/TypeScript
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tsbuildinfo
+
+# Builds & coverage
 dist/
 build/
 coverage/
 *.lcov
 stryker-report/
+
+# Artifacts & security
 sbom*.json
+*.cdx.json
+*.attestation
+.env
+.env.*
+!.env.example
+secrets/
+
+# Misc
+.tmp/
+.cache/
+configure_orchestrator_env.sh
+github-app-credentials.txt
+.DS_Store

@@ -54,6 +54,7 @@ jobs:
       - name: Sync to S3
         run: |
           aws s3 sync "${{ env.WEB_DIR }}/build" "s3://${{ steps.envsel.outputs.bucket }}/" --delete
-      - name: Invalidate CloudFront
+      - name: Invalidate CloudFront (if configured)
+        if: ${{ steps.envsel.outputs.cf != '' }}
         run: |
           aws cloudfront create-invalidation --distribution-id "${{ steps.envsel.outputs.cf }}" --paths "/*"

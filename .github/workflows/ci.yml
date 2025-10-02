@@ -1,7 +1,7 @@
 name: test
 on:
-  pull_request: { branches: [main] }
-  push: { branches: [main] }
+  pull_request: { branches: [main, aws_gh_setup] }
+  push: { branches: [main, aws_gh_setup] }
 
 env:
   NODE_VERSION: '20'
@@ -23,10 +23,11 @@ jobs:
       # ---------- API ----------
       - name: Setup Node (API)
         uses: actions/setup-node@v4
-        with: { node-version: ${{ env.NODE_VERSION }} }
+        with:
+          node-version: ${{ env.NODE_VERSION }}
       - name: Install API deps
         working-directory: ${{ env.API_DIR }}
-        run: npm ci
+        run: npm ci || npm install
       - name: Build API
         working-directory: ${{ env.API_DIR }}
         run: npm run build --if-present
@@ -47,7 +48,7 @@ jobs:
       # ---------- WEB ----------
       - name: Install Web deps
         working-directory: ${{ env.WEB_DIR }}
-        run: npm ci
+        run: npm ci || npm install
       - name: Build Web
         working-directory: ${{ env.WEB_DIR }}
         run: npm run build --if-present
@@ -67,15 +68,11 @@ jobs:
 
       # ---------- SBOM (both projects) ----------
       - name: Generate CycloneDX SBOM (API)
-        uses: CycloneDX/gh-node-module-generatebom@v3
-        with:
-          path: ${{ env.API_DIR }}
-          output: '${{ env.API_DIR }}/sbom-api.cdx.json'
+        working-directory: ${{ env.API_DIR }}
+        run: npx @cyclonedx/cyclonedx-npm --output-file sbom-api.cdx.json --output-format JSON
       - name: Generate CycloneDX SBOM (Web)
-        uses: CycloneDX/gh-node-module-generatebom@v3
-        with:
-          path: ${{ env.WEB_DIR }}
-          output: '${{ env.WEB_DIR }}/sbom-web.cdx.json'
+        working-directory: ${{ env.WEB_DIR }}
+        run: npx @cyclonedx/cyclonedx-npm --output-file sbom-web.cdx.json --output-format JSON
       - name: Upload SBOM artifacts
         uses: actions/upload-artifact@v4
         with:
