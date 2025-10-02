@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { verifySignature } from './github/signature';
 import { registerTasksRoute } from './routes/tasks';
 import { AppConfig, WebhookLogPayload, WebhookRateLimit } from './types';
+import { routeGithubEvent } from './webhooks/router';
+import { getTask } from './state/store';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -255,11 +257,42 @@ export function buildServer(config: AppConfig): FastifyInstance {
 
       request.log.info({ webhook: summary }, 'github webhook accepted');
 
-      return reply.code(200).send({ status: 'received' });
+      // Dispatch to router (best-effort)
+      try {
+        if (parsedBody) {
+          routeGithubEvent(event, parsedBody);
+        }
+      } catch (err) {
+        request.log.warn({ err }, 'webhook handler error');
+      }
+
+  return reply.code(200).send({ status: 'received' });
     },
   );
 
   registerTasksRoute(app);
+
+  app.get('/tasks/:issue_number', async (request, reply) => {
+    const param = (request.params as { issue_number?: string }).issue_number;
+    const issue_number = param ? Number(param) : NaN;
+    if (!Number.isFinite(issue_number)) {
+      return reply.code(400).send({ status: 'error', message: 'invalid issue number' });
+    }
+    const rec = getTask(issue_number);
+    if (!rec) {
+      return reply.code(404).send({ status: 'not_found' });
+    }
+    return reply.send({
+      issue_number: rec.issue_number,
+      state: rec.state,
+      last_event: rec.timeline.at(-1),
+      timeline: rec.timeline.slice(-25),
+      repo: rec.repo,
+      pr_number: rec.pr_number,
+      checks: { required: rec.checks.required, green: rec.checks.green },
+      updatedAt: rec.updatedAt,
+    });
+  });
 
   return app;
 }
