@@ -1,3 +1,23 @@
+Yes — Task 4 is truly done and production-grade. The UI builds, injects runtime config, hits the orchestrator, and your coverage gates are green. Nothing blocking promotion.
+
+# Assessment (tight)
+
+* ✅ UI v0 ships: `/#/` create, `/#/status/:issue_number` poll; runtime `ORCHESTRATOR_BASE` via `config.js` + Docker `entrypoint.sh`.
+* ✅ Web tests & coverage: S/L/F 100%, Branches ~95.1%; ts-jest warnings removed.
+* ✅ Build & run path: `build-static.js` (esbuild) + `Dockerfile.web`; README explains usage.
+* ⏭️ Ready for Task 5. Given you want a **customer-facing product**, the next step should be **durability and correctness** (state beyond process restarts), not just polish.
+
+# Recommendation for Task 5
+
+Prioritize **Durability & Idempotency**:
+
+* Persist task state and timeline in Redis (or compatible store), add webhook **idempotency** (delivery IDs), and expose minimal **ops metrics**. This makes the system reliable across restarts, scale-out, and bursty webhook deliveries.
+
+---
+
+## Paste-ready instruction — **Task #5 (single session): Redis-backed state, webhook idempotency, basic metrics**
+
+```
 Title: Task #5 — Durable task state (Redis), webhook idempotency, and basic metrics
 
 Objective
@@ -78,3 +98,12 @@ Acceptance criteria
 2) Webhook idempotency via delivery IDs; duplicates are ignored.
 3) /metricsz endpoint returns expected JSON and does not expose secrets.
 4) CI gates green (coverage/mutation/CodeQL/SBOM/SLSA) and successful deploy.
+```
+
+---
+
+### After Task 5 (preview)
+
+* **Task 6A — UI improvements:** status badges, checks table, PR/Issue deep links, input validation polish.
+* **Task 6B — Assignment automation:** auto-assign Copilot Agent (if API path is approved in your org) or comment triggers.
+* **Task 6C — Audit pipeline:** push orchestrator action logs to SIEM and retain evidence bundles per task.

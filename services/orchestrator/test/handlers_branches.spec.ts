@@ -106,4 +106,35 @@ describe('handlers branch coverage', () => {
     const getRes = await app.inject({ method: 'GET', url: '/tasks/804' });
     expect(getRes.json().state).toBe('CHECKS_RED');
   });
+
+  it('check_run all required checks green -> CHECKS_GREEN', async () => {
+    const app = buildServer(loadConfigFromEnv(baseEnv));
+    // Seed PR link to #901 and #902 using title and body
+    const pr = {
+      action: 'opened',
+      pull_request: { number: 915, title: 'Implements #901', body: 'Also refs #902' },
+      repository: { full_name: 'acme/repo' },
+    };
+    let body = JSON.stringify(pr);
+    await app.inject({ method: 'POST', url: '/webhooks/github', payload: body, headers: {
+      'content-type': 'application/json', 'x-github-event': 'pull_request', 'x-hub-signature-256': sign(SECRET, body)
+    }});
+
+    // Fire workflow_run/check_run for each required check success for issue #901
+    const checks = ['test','codeql','sboms-orchestrator','Attest build provenance (Orchestrator)'];
+    for (const name of checks) {
+      const wr = {
+        action: 'completed',
+        workflow_run: { name, conclusion: 'success', display_title: 'Build #901' },
+        repository: { full_name: 'acme/repo' },
+      };
+      body = JSON.stringify(wr);
+      await app.inject({ method: 'POST', url: '/webhooks/github', payload: body, headers: {
+        'content-type': 'application/json', 'x-github-event': 'workflow_run', 'x-hub-signature-256': sign(SECRET, body)
+      }});
+    }
+
+    const getRes = await app.inject({ method: 'GET', url: '/tasks/901' });
+    expect(getRes.json().state).toBe('CHECKS_GREEN');
+  });
 });

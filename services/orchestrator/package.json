@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@fastify/rate-limit": "^8.1.1",
+    "redis": "^4.7.0",
     "jsonwebtoken": "^9.0.2",
     "fastify": "^4.26.2",
     "pino": "^8.18.0",

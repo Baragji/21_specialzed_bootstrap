@@ -8,7 +8,7 @@ import { verifySignature } from './github/signature';
 import { registerTasksRoute } from './routes/tasks';
 import { AppConfig, WebhookLogPayload, WebhookRateLimit } from './types';
 import { routeGithubEvent } from './webhooks/router';
-import { getTask } from './state/store';
+import { getTaskState, seenDelivery, storeMode, approxTaskCount } from './state/store';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -196,6 +196,17 @@ export function buildServer(config: AppConfig): FastifyInstance {
     return reply.send({ status: 'ok' });
   });
 
+  const startedAt = Date.now();
+  app.get('/metricsz', async (_request, reply) => {
+    const uptimeSec = Math.floor((Date.now() - startedAt) / 1000);
+    return reply.send({
+      uptimeSec,
+      mode: storeMode(),
+      keys: { tasks: approxTaskCount() },
+      version: process.env.GIT_SHA || 'dev',
+    });
+  });
+
   app.post(
     '/webhooks/github',
     {
@@ -259,9 +270,14 @@ export function buildServer(config: AppConfig): FastifyInstance {
 
       // Dispatch to router (best-effort)
       try {
-        if (parsedBody) {
-          routeGithubEvent(event, parsedBody);
+        // Idempotency based on GitHub delivery id
+        if (deliveryId) {
+          const already = await seenDelivery(deliveryId);
+          if (already) {
+            return reply.code(200).send({ status: 'received' });
+          }
         }
+        if (parsedBody) routeGithubEvent(event, parsedBody);
       } catch (err) {
         request.log.warn({ err }, 'webhook handler error');
       }
@@ -278,20 +294,25 @@ export function buildServer(config: AppConfig): FastifyInstance {
     if (!Number.isFinite(issue_number)) {
       return reply.code(400).send({ status: 'error', message: 'invalid issue number' });
     }
-    const rec = getTask(issue_number);
-    if (!rec) {
-      return reply.code(404).send({ status: 'not_found' });
+    try {
+      const rec = await getTaskState(issue_number);
+      return reply.send({
+        issue_number: rec.issue_number,
+        state: rec.state,
+        last_event: rec.last_event,
+        timeline: rec.timeline.slice(-25),
+        repo: rec.repo,
+        pr_number: rec.pr_number,
+        checks: { required: rec.checks.required, green: rec.checks.green },
+        updatedAt: rec.updatedAt,
+      });
+    } catch (e: any) {
+      if (e && e.code === 'NOT_FOUND') {
+        return reply.code(404).send({ status: 'not_found' });
+      }
+      request.log.warn({ err: e }, 'failed to get task state');
+      return reply.code(500).send({ status: 'error' });
     }
-    return reply.send({
-      issue_number: rec.issue_number,
-      state: rec.state,
-      last_event: rec.timeline.at(-1),
-      timeline: rec.timeline.slice(-25),
-      repo: rec.repo,
-      pr_number: rec.pr_number,
-      checks: { required: rec.checks.required, green: rec.checks.green },
-      updatedAt: rec.updatedAt,
-    });
   });
 
   return app;
